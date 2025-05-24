@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,9 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { useToast } from "@/hooks/use-toast";
 import { Edit3 } from "lucide-react";
 import React from "react";
+
+import { auth, db } from "@/lib/firebase";
+import { doc, setDoc } from "firebase/firestore";
 
 const symptomSchema = z.object({
   mood: z.custom<MoodScale>((val) => typeof val === 'number' && val >= 1 && val <= 5, {
@@ -37,16 +41,6 @@ const symptomSchema = z.object({
 
 type SymptomFormValues = z.infer<typeof symptomSchema>;
 
-// Placeholder server action
-async function submitSymptomEntry(data: SymptomEntry) {
-  console.log("Submitting symptom entry:", data);
-  // Simulate API call
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  // throw new Error("Failed to submit entry."); // Uncomment to test error
-  return { success: true, message: "Entry submitted successfully!" };
-}
-
-
 export default function TrackerPage() {
   const { toast } = useToast();
   const form = useForm<SymptomFormValues>({
@@ -61,43 +55,54 @@ export default function TrackerPage() {
   });
 
   const onSubmit = async (data: SymptomFormValues) => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      toast({
+        variant: "destructive",
+        title: "Authentication Error",
+        description: "You must be logged in to save an entry. Please log in and try again.",
+      });
+      form.reset(data); // Keep form data if submission fails due to auth
+      return;
+    }
+
     const entryToSubmit: SymptomEntry = {
-      id: new Date().toISOString(), // Placeholder ID
+      id: new Date().toISOString(), // This will be used as the document ID
       date: new Date(),
-      userId: "currentUser", // Placeholder user ID
+      userId: currentUser.uid, // Associate entry with the logged-in user
       mood: data.mood,
       sleepHours: data.sleepHours ? Number(data.sleepHours) : undefined,
       sleepQuality: data.sleepQuality,
-      appetite: data.appetite!, // Schema ensures these are defined if form is valid
+      appetite: data.appetite!,
       activity: data.activity!,
       socialEngagement: data.socialEngagement!,
       journal: data.journal,
     };
 
     try {
-      const result = await submitSymptomEntry(entryToSubmit);
-      if (result.success) {
-        toast({
-          title: "Entry Saved! ✨",
-          description: "Your daily check-in has been recorded.",
-        });
-        form.reset({
-          mood: undefined,
-          sleepHours: undefined,
-          sleepQuality: undefined,
-          appetite: undefined,
-          activity: undefined,
-          socialEngagement: undefined,
-          journal: ""
-        });
-      } else {
-        throw new Error(result.message || "Failed to save entry.");
-      }
+      // Define the path in Firestore: users/{userId}/symptomEntries/{entryId}
+      const entryRef = doc(db, "users", currentUser.uid, "symptomEntries", entryToSubmit.id);
+      await setDoc(entryRef, entryToSubmit);
+
+      toast({
+        title: "Entry Saved! ✨",
+        description: "Your daily check-in has been recorded in Firestore.",
+      });
+      form.reset({
+        mood: undefined,
+        sleepHours: undefined,
+        sleepQuality: undefined,
+        appetite: undefined,
+        activity: undefined,
+        socialEngagement: undefined,
+        journal: ""
+      });
     } catch (error) {
+      console.error("Error saving symptom entry to Firestore:", error);
       toast({
         variant: "destructive",
         title: "Uh oh! Something went wrong.",
-        description: error instanceof Error ? error.message : "Could not save your entry. Please try again.",
+        description: error instanceof Error ? error.message : "Could not save your entry to Firestore. Please try again.",
       });
     }
   };
@@ -297,3 +302,6 @@ export default function TrackerPage() {
     </Card>
   );
 }
+
+
+    
