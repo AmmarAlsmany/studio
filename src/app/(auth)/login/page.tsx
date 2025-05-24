@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -22,7 +23,10 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { useRouter } from "next/navigation"; 
+import { useRouter } from "next/navigation";
+import { auth } from "@/lib/firebase";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { useToast } from "@/hooks/use-toast";
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email." }),
@@ -33,6 +37,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
@@ -41,13 +46,32 @@ export default function LoginPage() {
     },
   });
 
-  // Placeholder login function
   const onSubmit = async (data: LoginFormValues) => {
-    console.log("Login data:", data);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    // On successful login, redirect to dashboard
-    router.push("/dashboard"); 
+    form.clearErrors(); // Clear previous errors
+    try {
+      await signInWithEmailAndPassword(auth, data.email, data.password);
+      toast({
+        title: "Login Successful! 🎉",
+        description: "Welcome back!",
+      });
+      router.push("/dashboard");
+    } catch (error: any) {
+      console.error("Login error:", error);
+      let errorMessage = "An unexpected error occurred. Please try again.";
+      if (error.code === "auth/user-not-found" || error.code === "auth/wrong-password" || error.code === "auth/invalid-credential") {
+        errorMessage = "Invalid email or password. Please try again.";
+        form.setError("email", { type: "manual", message: " " }); // Add error to a field to show general message
+        form.setError("password", { type: "manual", message: "Invalid email or password." });
+      } else if (error.code === "auth/invalid-email") {
+        errorMessage = "The email address is not valid.";
+        form.setError("email", { type: "manual", message: errorMessage });
+      }
+      toast({
+        variant: "destructive",
+        title: "Login Failed",
+        description: errorMessage,
+      });
+    }
   };
 
   return (

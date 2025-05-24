@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -25,6 +26,10 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { useRouter } from "next/navigation";
+import { auth, db } from "@/lib/firebase";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { doc, setDoc } from "firebase/firestore";
+import { useToast } from "@/hooks/use-toast";
 
 const registerSchema = z.object({
   username: z.string().min(3, { message: "Username must be at least 3 characters." }),
@@ -41,20 +46,21 @@ const registerSchema = z.object({
   return true;
 }, {
   message: "Medication name and dose are required if you are on medication.",
-  path: ["medicationName"], 
+  path: ["medicationName"],
 });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
       username: "",
       email: "",
       password: "",
-      onMedication: undefined, // Ensure it's undefined initially to trigger required_error
+      onMedication: undefined,
       medicationName: "",
       medicationDose: "",
     },
@@ -62,13 +68,47 @@ export default function RegisterPage() {
 
   const onMedicationValue = form.watch("onMedication");
 
-  // Placeholder registration function
   const onSubmit = async (data: RegisterFormValues) => {
-    console.log("Registration data:", data);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    // On successful registration, redirect to login or dashboard
-    router.push("/dashboard"); 
+    form.clearErrors();
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+      const user = userCredential.user;
+
+      // Store additional user information in Firestore
+      await setDoc(doc(db, "users", user.uid), {
+        username: data.username,
+        email: data.email,
+        age: data.age,
+        onMedication: data.onMedication,
+        medicationName: data.onMedication === "yes" ? data.medicationName : null,
+        medicationDose: data.onMedication === "yes" ? data.medicationDose : null,
+        createdAt: new Date(),
+      });
+
+      toast({
+        title: "Account Created! 🎉",
+        description: "Welcome to TeenMind!",
+      });
+      router.push("/dashboard");
+    } catch (error: any) {
+      console.error("Registration error:", error);
+      let errorMessage = "An unexpected error occurred. Please try again.";
+      if (error.code === "auth/email-already-in-use") {
+        errorMessage = "This email address is already in use. Please try another one.";
+        form.setError("email", { type: "manual", message: errorMessage });
+      } else if (error.code === "auth/invalid-email") {
+        errorMessage = "The email address is not valid.";
+        form.setError("email", { type: "manual", message: errorMessage });
+      } else if (error.code === "auth/weak-password") {
+        errorMessage = "The password is too weak. Please choose a stronger password.";
+        form.setError("password", { type: "manual", message: errorMessage });
+      }
+      toast({
+        variant: "destructive",
+        title: "Registration Failed",
+        description: errorMessage,
+      });
+    }
   };
 
   return (
@@ -143,7 +183,7 @@ export default function RegisterPage() {
                   <FormControl>
                     <RadioGroup
                       onValueChange={field.onChange}
-                      defaultValue={field.value}
+                      value={field.value} // Changed from defaultValue to value
                       className="flex space-x-4"
                     >
                       <FormItem className="flex items-center space-x-2 space-y-0">
