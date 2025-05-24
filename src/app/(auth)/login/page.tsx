@@ -60,12 +60,14 @@ export default function LoginPage() {
       let errorMessage = "An unexpected error occurred. Please try again.";
       if (error.code === "auth/user-not-found" || error.code === "auth/wrong-password" || error.code === "auth/invalid-credential") {
         errorMessage = "Invalid email or password. Please try again.";
-        form.setError("email", { type: "manual", message: " " }); // Add error to a field to show general message
-        form.setError("password", { type: "manual", message: "Invalid email or password." });
+        // Only set error on password field for general credential errors
+        form.setError("password", { type: "manual", message: errorMessage });
       } else if (error.code === "auth/invalid-email") {
         errorMessage = "The email address is not valid.";
         form.setError("email", { type: "manual", message: errorMessage });
       }
+      // For other errors, no specific field error is set, relies on toast
+      
       toast({
         variant: "destructive",
         title: "Login Failed",
