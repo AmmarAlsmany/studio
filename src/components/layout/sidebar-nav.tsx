@@ -1,7 +1,8 @@
+
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation"; // Added useRouter
 import {
   LayoutDashboard,
   ListChecks,
@@ -16,6 +17,9 @@ import {
   SidebarMenuButton,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
+import { auth } from "@/lib/firebase"; // Added auth import
+import { signOut } from "firebase/auth"; // Added signOut import
+import { useToast } from "@/hooks/use-toast";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -27,12 +31,25 @@ const navItems = [
 
 export function SidebarNav() {
   const pathname = usePathname();
+  const router = useRouter(); // Initialized useRouter
+  const { toast } = useToast();
 
-  // Placeholder logout function
-  const handleLogout = () => {
-    // In a real app, this would clear auth state and redirect
-    console.log("Logout clicked");
-    // Example: router.push('/login');
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      toast({
+        title: "Logged Out",
+        description: "You have been successfully logged out.",
+      });
+      router.push('/login'); // Redirect to login page
+    } catch (error) {
+      console.error("Logout error:", error);
+      toast({
+        variant: "destructive",
+        title: "Logout Failed",
+        description: "Could not log you out. Please try again.",
+      });
+    }
   };
 
   return (
