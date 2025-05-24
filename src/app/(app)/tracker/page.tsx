@@ -9,12 +9,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { MoodSelector } from "@/components/tracker/mood-selector";
 import type { MoodScale, SleepQuality, AppetiteLevel, ActivityLevel, SocialEngagementLevel, SymptomEntry } from "@/types";
-import { useForm }_form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Edit3 } from "lucide-react";
+import React from "react";
 
 const symptomSchema = z.object({
   mood: z.custom<MoodScale>((val) => typeof val === 'number' && val >= 1 && val <= 5, {
